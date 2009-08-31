@@ -1,0 +1,16 @@
+Changes
+-------
+
+Version 0.2.0 (2009-08-31)
+--------------------------
+
+  - Using a single StringListProperty instead of one StringProperty for each
+    cell. See http://code.google.com/p/geomodel/wiki/PreRevision8Migration how
+    to migrate existing GeoModel entity indexes.
+  - More unit tests.
+
+
+Version 0.1.0 (2009-07-15)
+--------------------------
+
+  - Initial PyPI release.
