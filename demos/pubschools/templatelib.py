@@ -28,6 +28,7 @@ JSAPI_KEYS = {
   'localhost:8081': 'ABQIAAAAsc0UQXoo2BnAJLhtpWCJFBR4EqRj3RNZnoYuzojShxUjcPQKRRTRGGOs44wdQ4X8DzLXMfd1zp6Pag',
   'geomodel-demo.appspot.com:80': 'ABQIAAAAKkfkHb2nXsD0o1OX2TbdkRTF1o4efM8vQJVwhtHQDLR3ZWMiYhT5A9y4YtISxJ2FetOMuCL1YkBiaw',
   '2.latest.geomodel-demo.appspot.com:80': 'ABQIAAAAKkfkHb2nXsD0o1OX2TbdkRTviFmNkNIQO8yqbxHmKO-CSduAsRR3q-4j7qE0AI6PhpvozLMFiXKlWg',
+  'withasync.latest.geomodel-demo.appspot.com:80': 'ABQIAAAAsc0UQXoo2BnAJLhtpWCJFBQUFo_sJ21_5EbSjtBSiUUP_OBz9hR_kNlKPiNqsV63qsnt7zmqeV_S9g',
 }
 
 

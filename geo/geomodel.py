@@ -29,6 +29,13 @@ import sys
 
 from google.appengine.ext import db
 
+try:
+  import asynctools
+except ImportError:
+  import os.path
+  sys.path += [os.path.join(os.path.dirname(__file__), 'lib')]
+  import asynctools
+
 import geocell
 import geomath
 import geotypes
@@ -98,13 +105,19 @@ class GeoModel(db.Model):
     query_geocells = geocell.best_bbox_search_cells(bbox, cost_function)
 
     if query_geocells:
+      # Parallelize queries using asynctools.
+      task_runner = asynctools.AsyncMultiTask()
+      
+      from google.appengine.api.datastore import MultiQuery
+      for search_cell in query_geocells:
+        task_runner.append(asynctools.QueryTask(
+            copy.deepcopy(query).filter('location_geocells =', search_cell),
+            limit=max_results))
+      
+      task_runner.run()
+      cell_results = [task.get_result() for task in task_runner]
+      
       if query._Query__orderings:
-        # NOTE(romannurik): since 'IN' queries seem boken in App Engine,
-        # manually search each geocell and then merge results in-place
-        cell_results = [copy.deepcopy(query)
-            .filter('location_geocells =', search_cell)
-            .fetch(max_results) for search_cell in query_geocells]
-
         # Manual in-memory sort on the query's defined ordering.
         query_orderings = query._Query__orderings or []
         def _ordering_fn(ent1, ent2):
@@ -121,9 +134,13 @@ class GeoModel(db.Model):
       else:
         # NOTE: We can't pass in max_results because of non-uniformity of the
         # search.
-        results = (query
-            .filter('location_geocells IN', query_geocells)
-            .fetch(1000))[:max_results]
+        # Return results proportionally
+        total_results = sum(len(cell_result) for cell_result in cell_results)
+        _numkeep = lambda arr: int(math.ceil(len(arr) * 1.0 / total_results))
+        cell_results = [cell_result[:_numkeep(cell_result)]
+                        for cell_result in cell_results]
+        results = reduce(lambda x, y: x + y, cell_results)
+
     else:
       results = []
 
