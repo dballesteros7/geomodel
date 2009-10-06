@@ -15,7 +15,7 @@
 # limitations under the License.
 
 application: geomodel-demo
-version: 2
+version: withasync
 runtime: python
 api_version: 1
 

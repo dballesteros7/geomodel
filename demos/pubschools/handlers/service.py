@@ -115,30 +115,31 @@ class SearchService(webapp.RequestHandler):
         else:
           (base_query.filter('grades_taught >=', grade_range[0])
                      .filter('grades_taught <=', grade_range[1]))
-        
+      
         # App Engine requires inequality filtered properties to be
         # the first ordering. Also apply this ordering for grades_taught =
         # filters to simplify indexes.
         base_query.order('grades_taught')
-      
+    
       if school_type:
         base_query.filter('school_type =', school_type)
-      
+    
       # Natural ordering chosen to be public school enrollment.
       base_query.order('-enrollment')
-      
+    
       # Perform proximity or bounds fetch.
       if query_type == 'proximity':
         results = PublicSchool.proximity_fetch(
             base_query,
-            center, max_results=max_results, max_distance=max_distance)
+            center, max_results=max_results, max_distance=max_distance,
+            start_resolution=7)
       elif query_type == 'bounds':
         results = PublicSchool.bounding_box_fetch(
             base_query,
             bounds, max_results=max_results)
-      
+    
       public_attrs = PublicSchool.public_attributes()
-      
+    
       results_obj = [
           _merge_dicts({
             'lat': result.location.lat,

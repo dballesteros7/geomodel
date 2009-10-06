@@ -18,13 +18,27 @@
 
 __author__ = 'api.roman.public@gmail.com (Roman Nurik)'
 
+import copy
+import logging
+import math
+
+try:
+  import asynctools
+except ImportError:
+  import os.path
+  import sys
+  sys.path += [os.path.join(os.path.dirname(__file__), 'lib')]
+  import asynctools
+
 import geocell
 import geomath
 import geotypes
 
 
 def merge_in_place(*lists, **kwargs):
-  """Merges an arbitrary number of pre-sorted lists in-place, into the first
+  """Merges pre-sorted lists.
+  
+  Merges an arbitrary number of pre-sorted lists in-place, into the first
   list, possibly pruning out duplicates. Source lists must not have
   duplicates.
 
@@ -82,36 +96,108 @@ def merge_in_place(*lists, **kwargs):
   return lists[0]
 
 
-def distance_sorted_edges(cells, point):
-  """Returns the edges of the rectangular region containing all of the
-  given geocells, sorted by distance from the given point, along with
-  the actual distances from the point to these edges.
+def max_box(cells):
+  """Returns the rectangular region containing all of the given geocells.
+  
+  Args:
+    cells: A list of adjacent geocells.
+  
+  Returns:
+    A geotypes.Box representing the maximum bounds of the set of adjacent cells.
+  """
+  boxes = [geocell.compute_box(cell) for cell in cells]
+  return geotypes.Box(max([box.north for box in boxes]),
+                      max([box.east for box in boxes]),
+                      min([box.south for box in boxes]),
+                      min([box.west for box in boxes]))
+
+
+def distance_sorted_edges(box, point):
+  """Returns the edge directions of the box, sorted by distance from a point.
+  
+  Returns the edge directions (i.e. NORTH, SOUTH, etc.) of the box, sorted by
+  distance from the given point, along with the actual distances from the point
+  to these edges.
 
   Args:
-    cells: The cells (should be adjacent) defining the rectangular region
-        whose edge distances are requested.
+    box: The geotypes.Box defining the rectangular region whose edge distances
+        are requested.
     point: The point that should determine the edge sort order.
 
   Returns:
     A list of (direction, distance) tuples, where direction is the edge
-    and distance is the distance from the point to that edge. A direction
-    value of (0,-1), for example, corresponds to the South edge of the
-    rectangular region containing all of the given geocells.
+    direction and distance is the distance from the point to that edge.
+    Direction values will be NORTH, SOUTH, EAST, or WEST
   """
-  # TODO(romannurik): Assert that lat,lon are actually inside the geocell.
-  boxes = [geocell.compute_box(cell) for cell in cells]
-
-  max_box = geotypes.Box(max([box.north for box in boxes]),
-                         max([box.east for box in boxes]),
-                         min([box.south for box in boxes]),
-                         min([box.west for box in boxes]))
+  # TODO(romannurik): Assert that lat,lon are actually inside the box.
   return zip(*sorted([
-      ((0,-1), geomath.distance(geotypes.Point(max_box.south, point.lon),
-                                point)),
-      ((0,1),  geomath.distance(geotypes.Point(max_box.north, point.lon),
-                                point)),
-      ((-1,0), geomath.distance(geotypes.Point(point.lat, max_box.west),
-                                point)),
-      ((1,0),  geomath.distance(geotypes.Point(point.lat, max_box.east),
-                                point))],
+      (geocell.NORTH,
+       geomath.distance(geotypes.Point(box.north, point.lon), point)),
+      (geocell.SOUTH,
+       geomath.distance(geotypes.Point(box.south, point.lon), point)),
+      (geocell.WEST,
+       geomath.distance(geotypes.Point(point.lat, box.west), point)),
+      (geocell.EAST,
+       geomath.distance(geotypes.Point(point.lat, box.east), point))],
       lambda x, y: cmp(x[1], y[1])))
+
+
+def async_in_query_fetch(query, property_name, values, max_results=1000,
+                         debug=False):
+  """Fetches query results asynchronously, with an extra IN filter applied.
+  
+  Args:
+    query: The base db.Query to query on.
+    property_name: A str representing the property to filter on.
+    values: A list of acceptable values for the property, to filter on.
+    max_results: An optional int for the maximum number of results to return.
+    debug: A boolean indicating whether or not to log debug info.
+  
+  Returns:
+    The fetched entities.
+  
+  Raises:
+    Any exceptions that google.appengine.ext.db.Query.fetch() can raise.
+  """
+  if not values:
+    return []
+
+  # Parallelize queries using asynctools.
+  task_runner = asynctools.AsyncMultiTask()
+  
+  for value in values:
+    task_runner.append(asynctools.QueryTask(
+        copy.deepcopy(query).filter('%s =' % property_name, value),
+        limit=max_results))
+  
+  task_runner.run()
+  entities_by_value = [task.get_result() for task in task_runner]
+  
+  if debug:
+    logging.debug(('GeoModel: '
+                   'Fetch complete for %s = %s') %
+                  (property_name, ','.join(values)))
+  
+  if query._Query__orderings:
+    # Manual in-memory sort on the query's defined ordering.
+    query_orderings = query._Query__orderings or []
+    def _ordering_fn(ent1, ent2):
+      for prop, direction in query_orderings:
+        prop_cmp = cmp(getattr(ent1, prop), getattr(ent2, prop))
+        if prop_cmp != 0:
+          return prop_cmp if direction == 1 else -prop_cmp
+
+      return -1  # Default ent1 < ent2.
+
+    merge_in_place(cmp_fn=_ordering_fn,
+                   dup_fn=lambda x, y: x.key() == y.key(),
+                   *entities_by_value)
+    return entities_by_value[0][:max_results]
+  else:
+    # Return max_results entities, proportionally by geocell, since there
+    # is no ordering.
+    total_results = sum(len(val_entities) for val_entities in entities_by_value)
+    _numkeep = lambda arr: int(math.ceil(len(arr) * 1.0 / total_results))
+    entities_by_value = [val_entities[:_numkeep(val_entities)]
+                         for val_entities in entities_by_value]
+    return reduce(lambda x, y: x + y, entities_by_value)
