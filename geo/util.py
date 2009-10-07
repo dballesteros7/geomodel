@@ -197,6 +197,8 @@ def async_in_query_fetch(query, property_name, values, max_results=1000,
     # Return max_results entities, proportionally by geocell, since there
     # is no ordering.
     total_results = sum(len(val_entities) for val_entities in entities_by_value)
+    if not total_results:
+      return []
     _numkeep = lambda arr: int(math.ceil(len(arr) * 1.0 / total_results))
     entities_by_value = [val_entities[:_numkeep(val_entities)]
                          for val_entities in entities_by_value]
