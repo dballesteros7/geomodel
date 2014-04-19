@@ -1,5 +1,26 @@
-#!/usr/bin/python2.5
-#
+"""
+The MIT License (MIT)
+
+Copyright (c) 2014 Diego Ballesteros
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 # Copyright 2009 Roman Nurik
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +43,7 @@ TODO(romannurik): document how bounding box and proximity queries work.
 
 __author__ = 'api.roman.public@gmail.com (Roman Nurik)'
 
-import copy
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 import logging
 
 import geocell
@@ -31,23 +51,22 @@ import geomath
 import util
 
 
-DEBUG = False
-
+_DEBUG = False
 
 def default_cost_function(num_cells, resolution):
     """The default cost function, used if none is provided by the developer."""
     return 1e10000 if num_cells > pow(geocell._GEOCELL_GRID_SIZE, 2) else 0
 
 
-class GeoModel(db.Model):
+class GeoModel(ndb.Model):
     """A base model class for single-point geographically located entities.
 
     Attributes:
         location: A db.GeoPt that defines the single geographic point
                 associated with this entity.
     """
-    location = db.GeoPtProperty()
-    location_geocells = db.StringListProperty()
+    location = ndb.GeoPtProperty()
+    location_geocells = ndb.StringProperty(repeated=True)
 
     def update_location(self):
         """Syncs underlying geocell properties with the entity's location.
@@ -58,14 +77,15 @@ class GeoModel(db.Model):
         if self.location:
             max_res_geocell = geocell.compute(self.location)
             self.location_geocells = [max_res_geocell[:res]
-                                                                for res in
-                                                                range(1, geocell.MAX_GEOCELL_RESOLUTION + 1)]
+                                      for res in
+                                        xrange(1,
+                                        geocell.MAX_GEOCELL_RESOLUTION + 1)]
         else:
             self.location_geocells = []
 
-    @staticmethod
+    @classmethod
     def bounding_box_fetch(query, bbox, max_results=1000,
-                                                 cost_function=None):
+                                        cost_function=None):
         """Performs a bounding box fetch on the given query.
 
         Fetches entities matching the given query with an additional filter
@@ -73,24 +93,26 @@ class GeoModel(db.Model):
         bounding box.
 
         Args:
-            query: A db.Query on entities of this kind that should be additionally
-                    filtered by bounding box and subsequently fetched.
-            bbox: A geotypes.Box indicating the bounding box to filter entities by.
-            max_results: An optional int indicating the maximum number of desired
-                    results.
+            query: A ndb.Query on entities of this kind that should
+                   be additionally filtered by bounding box and
+                   subsequently fetched.
+            bbox: A geotypes.Box indicating the bounding box
+                  to filter entities by.
+            max_results: An optional int indicating the maximum number of
+                        desired results.
             cost_function: An optional function that accepts two arguments:
-                    * num_cells: the number of cells to search
-                    * resolution: the resolution of each cell to search
-                    and returns the 'cost' of querying against this number of cells
-                    at the given resolution.
+                * num_cells: the number of cells to search
+                * resolution: the resolution of each cell to search
+                and returns the 'cost' of querying against this number of cells
+                at the given resolution.
 
         Returns:
             The fetched entities.
 
         Raises:
-            Any exceptions that google.appengine.ext.db.Query.fetch() can raise.
+            Any exceptions that google.appengine.ext.ndb.Query.fetch()
+            can raise.
         """
-        # TODO(romannurik): Check for GqlQuery.
         results = []
 
         if cost_function is None:
@@ -98,27 +120,27 @@ class GeoModel(db.Model):
         query_geocells = geocell.best_bbox_search_cells(bbox, cost_function)
 
         if query_geocells:
-            for entity in query.filter('location_geocells IN', query_geocells):
+            for entity in query.filter(GeoModel.location_geocells.IN(query_geocells)):
                 if len(results) == max_results:
                     break
                 if (entity.location.lat >= bbox.south and
-                        entity.location.lat <= bbox.north and
-                        entity.location.lon >= bbox.west and
-                        entity.location.lon <= bbox.east):
+                    entity.location.lat <= bbox.north and
+                    entity.location.lon >= bbox.west and
+                    entity.location.lon <= bbox.east):
                     results.append(entity)
 
-        if DEBUG:
+        if _DEBUG:
             logging.info('bbox query looked in %d geocells' % len(query_geocells))
 
         return results
 
-    @staticmethod
+    @classmethod
     def proximity_fetch(query, center, max_results=10, max_distance=0):
         """Performs a proximity/radius fetch on the given query.
 
         Fetches at most <max_results> entities matching the given query,
-        ordered by ascending distance from the given center point, and optionally
-        limited by the given maximum distance.
+        ordered by ascending distance from the given center point,
+        and optionally limited by the given maximum distance.
 
         This method uses a greedy algorithm that starts by searching high-resolution
         geocells near the center point and gradually looking in lower and lower
@@ -126,12 +148,13 @@ class GeoModel(db.Model):
         given query and no closer possible entities can be found.
 
         Args:
-            query: A db.Query on entities of this kind.
-            center: A geotypes.Point or db.GeoPt indicating the center point around
-                    which to search for matching entities.
+            query: A ndb.Query on entities of this kind.
+            center: A geotypes.Point or ndb.GeoPt
+                    indicating the center point around which to search
+                    for matching entities.
             max_results: An int indicating the maximum number of desired results.
-                    The default is 10, and the larger this number, the longer the fetch
-                    will take.
+                    The default is 10, and the larger this number,
+                    the longer the fetch will take.
             max_distance: An optional number indicating the maximum distance to
                     search, in meters.
 
@@ -140,9 +163,9 @@ class GeoModel(db.Model):
             center.
 
         Raises:
-            Any exceptions that google.appengine.ext.db.Query.fetch() can raise.
+            Any exceptions that google.appengine.ext.ndb.Query.fetch()
+            can raise.
         """
-        # TODO(romannurik): check for GqlQuery
         results = []
 
         searched_cells = set()
@@ -165,26 +188,28 @@ class GeoModel(db.Model):
         # no duplicates in the resulting list.
         def _merge_results_in_place(a, b):
             util.merge_in_place(a, b,
-                                                cmp_fn=lambda x, y: cmp(x[1], y[1]),
-                                                dup_fn=lambda x, y: x[0].key() == y[0].key())
+                                cmp_fn=lambda x, y: cmp(x[1], y[1]),
+                                dup_fn=lambda x, y: x[0].key == y[0].key)
 
         sorted_edges = [(0, 0)]
         sorted_edge_distances = [0]
 
         while cur_geocells:
             closest_possible_next_result_dist = sorted_edge_distances[0]
-            if max_distance and closest_possible_next_result_dist > max_distance:
+            if max_distance and \
+                closest_possible_next_result_dist > max_distance:
                 break
 
-            cur_geocells_unique = list(set(cur_geocells).difference(searched_cells))
+            cur_geocells_unique = list(set(cur_geocells).
+                                       difference(searched_cells))
 
             # Run query on the next set of geocells.
-            temp_query = copy.deepcopy(query)    # TODO(romannurik): is this safe?
-            temp_query.filter('location_geocells IN', cur_geocells_unique)
+            temp_query = query.filter(GeoModel.location_geocells.
+                                        IN(cur_geocells_unique))
 
             # Update results and sort.
-            new_results = temp_query.fetch(1000)
-            if DEBUG:
+            new_results = temp_query.fetch(1000) #TODO: Why 1000?
+            if _DEBUG:
                 logging.info('fetch complete for %s' % (','.join(cur_geocells_unique),))
 
             searched_cells.update(cur_geocells)
@@ -193,7 +218,8 @@ class GeoModel(db.Model):
             # search center along with the search result itself, in a tuple.
             new_results = [(entity, geomath.distance(center, entity.location))
                                          for entity in new_results]
-            new_results = sorted(new_results, lambda dr1, dr2: cmp(dr1[1], dr2[1]))
+            new_results = sorted(new_results,
+                                 lambda dr1, dr2: cmp(dr1[1], dr2[1]))
             new_results = new_results[:max_results]
 
             # Merge new_results into results or the other way around, depending on
@@ -217,7 +243,7 @@ class GeoModel(db.Model):
                 cur_containing_geocell = cur_containing_geocell[:-1]
                 cur_geocells = list(set([cell[:-1] for cell in cur_geocells]))
                 if not cur_geocells or not cur_geocells[0]:
-                    break    # Done with search, we've searched everywhere.
+                    break  # Done with search, we've searched everywhere.
 
             elif len(cur_geocells) == 1:
                 # Get adjacent in one direction.
@@ -227,14 +253,16 @@ class GeoModel(db.Model):
 
             elif len(cur_geocells) == 2:
                 # Get adjacents in perpendicular direction.
-                nearest_edge = util.distance_sorted_edges([cur_containing_geocell],
-                                                                                                     center)[0][0]
+                nearest_edge = util.distance_sorted_edges(
+                                        [cur_containing_geocell], center)[0][0]
                 if nearest_edge[0] == 0:
                     # Was vertical, perpendicular is horizontal.
-                    perpendicular_nearest_edge = [x for x in sorted_edges if x[0] != 0][0]
+                    perpendicular_nearest_edge = \
+                        [x for x in sorted_edges if x[0] != 0][0]
                 else:
                     # Was horizontal, perpendicular is vertical.
-                    perpendicular_nearest_edge = [x for x in sorted_edges if x[0] == 0][0]
+                    perpendicular_nearest_edge = \
+                        [x for x in sorted_edges if x[0] == 0][0]
 
                 cur_geocells.extend(
                         [geocell.adjacent(cell, perpendicular_nearest_edge)
@@ -242,12 +270,12 @@ class GeoModel(db.Model):
 
             # We don't have enough items yet, keep searching.
             if len(results) < max_results:
-                if DEBUG:
+                if _DEBUG:
                     logging.debug('have %d results but want %d results, '
                                                 'continuing search' % (len(results), max_results))
                 continue
 
-            if DEBUG:
+            if _DEBUG:
                 logging.debug('have %d results' % (len(results),))
 
             # If the currently max_results'th closest item is closer than any
@@ -256,20 +284,20 @@ class GeoModel(db.Model):
                     geomath.distance(center, results[max_results - 1][0].location)
             if (closest_possible_next_result_dist >=
                     current_farthest_returnable_result_dist):
-                if DEBUG:
+                if _DEBUG:
                     logging.debug('DONE next result at least %f away, '
                                                 'current farthest is %f dist' %
                                                 (closest_possible_next_result_dist,
                                                  current_farthest_returnable_result_dist))
                 break
 
-            if DEBUG:
+            if _DEBUG:
                 logging.debug('next result at least %f away, '
                                             'current farthest is %f dist' %
                                             (closest_possible_next_result_dist,
                                              current_farthest_returnable_result_dist))
 
-        if DEBUG:
+        if _DEBUG:
             logging.info('proximity query looked '
                                      'in %d geocells' % len(searched_cells))
 

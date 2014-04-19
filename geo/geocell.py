@@ -68,7 +68,6 @@ region for the geocell.
 __author__ = 'api.roman.public@gmail.com (Roman Nurik)'
 
 import os.path
-import sys
 
 import geomath
 import geotypes
@@ -135,7 +134,6 @@ def best_bbox_search_cells(bbox, cost_function):
             continue
 
         cell_set = sorted(interpolate(cur_ne, cur_sw))
-        simplified_cells = []
 
         cost = cost_function(num_cells=len(cell_set), resolution=cur_resolution)
 

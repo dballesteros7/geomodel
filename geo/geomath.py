@@ -20,7 +20,6 @@ __author__ = 'api.roman.public@gmail.com (Roman Nurik)'
 
 import math
 
-import geotypes
 
 RADIUS = 6378135
 
@@ -29,8 +28,8 @@ def distance(p1, p2):
     """Calculates the great circle distance between two points (law of cosines).
 
     Args:
-        p1: A geotypes.Point or db.GeoPt indicating the first point.
-        p2: A geotypes.Point or db.GeoPt indicating the second point.
+        p1: A geotypes.Point or ndb.GeoPt indicating the first point.
+        p2: A geotypes.Point or ndb.GeoPt indicating the second point.
 
     Returns:
         The 2D great-circle distance between the two given points, in meters.
