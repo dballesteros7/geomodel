@@ -28,14 +28,14 @@ geocell[:-1] being geocell's immediate parent cell.
 To calculate the rectangle of a given geocell string, first divide the
 [-90,90] x [-180,180] latitude/longitude space evenly into a 4x4 grid like so:
 
-                         +---+---+---+---+ (90, 180)
-                         | a | b | e | f |
-                         +---+---+---+---+
-                         | 8 | 9 | c | d |
-                         +---+---+---+---+
-                         | 2 | 3 | 6 | 7 |
-                         +---+---+---+---+
-                         | 0 | 1 | 4 | 5 |
+               +---+---+---+---+ (90, 180)
+               | a | b | e | f |
+               +---+---+---+---+
+               | 8 | 9 | c | d |
+               +---+---+---+---+
+               | 2 | 3 | 6 | 7 |
+               +---+---+---+---+
+               | 0 | 1 | 4 | 5 |
     (-90,-180) +---+---+---+---+
 
 NOTE: The point (0, 0) is at the intersection of grid cells 3, 6, 9 and c. And,
@@ -46,19 +46,19 @@ Calculate the sub-rectangle for the first character of the geocell string and
 re-divide this sub-rectangle into another 4x4 grid. For example, if the geocell
 string is '78a', we will re-divide the sub-rectangle like so:
 
-                             .                                     .
-                             .                                     .
-                     . . +----+----+----+----+ (0, 180)
-                             | 7a | 7b | 7e | 7f |
-                             +----+----+----+----+
-                             | 78 | 79 | 7c | 7d |
-                             +----+----+----+----+
-                             | 72 | 73 | 76 | 77 |
-                             +----+----+----+----+
-                             | 70 | 71 | 74 | 75 |
+                 .                   .
+                 .                   .
+             . . +----+----+----+----+ (0, 180)
+                 | 7a | 7b | 7e | 7f |
+                 +----+----+----+----+
+                 | 78 | 79 | 7c | 7d |
+                 +----+----+----+----+
+                 | 72 | 73 | 76 | 77 |
+                 +----+----+----+----+
+                 | 70 | 71 | 74 | 75 |
     . . (-45,90) +----+----+----+----+
-                             .                                     .
-                             .                                     .
+                 .                   .
+                 .                   .
 
 Continue to re-divide into sub-rectangles and 4x4 grids until the entire
 geocell string has been exhausted. The final sub-rectangle is the rectangular
