@@ -84,8 +84,8 @@ class GeoModel(ndb.Model):
             self.location_geocells = []
 
     @classmethod
-    def bounding_box_fetch(query, bbox, max_results=1000,
-                                        cost_function=None):
+    def bounding_box_fetch(cls, query, bbox, max_results=1000,
+                           cost_function=None):
         """Performs a bounding box fetch on the given query.
 
         Fetches entities matching the given query with an additional filter
@@ -135,7 +135,8 @@ class GeoModel(ndb.Model):
         return results
 
     @classmethod
-    def proximity_fetch(query, center, max_results=10, max_distance=0):
+    def proximity_fetch(cls, query, center, max_results=10,
+                        max_distance=0):
         """Performs a proximity/radius fetch on the given query.
 
         Fetches at most <max_results> entities matching the given query,
