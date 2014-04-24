@@ -120,7 +120,7 @@ class GeoModel(ndb.Model):
         query_geocells = geocell.best_bbox_search_cells(bbox, cost_function)
 
         if query_geocells:
-            for entity in query.filter(GeoModel.location_geocells.IN(query_geocells)):
+            for entity in query.filter(cls.location_geocells.IN(query_geocells)):
                 if len(results) == max_results:
                     break
                 if (entity.location.lat >= bbox.south and
@@ -205,7 +205,7 @@ class GeoModel(ndb.Model):
                                        difference(searched_cells))
 
             # Run query on the next set of geocells.
-            temp_query = query.filter(GeoModel.location_geocells.
+            temp_query = query.filter(cls.location_geocells.
                                         IN(cur_geocells_unique))
 
             # Update results and sort.
