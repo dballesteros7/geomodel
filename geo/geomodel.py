@@ -68,7 +68,13 @@ class GeoModel(ndb.Model):
     location = ndb.GeoPtProperty()
     location_geocells = ndb.StringProperty(repeated=True)
 
-    def update_location(self):
+    def _pre_put_hook(self):
+        """Ensure that before storing the entity in the datastore,
+        the geocells are up to date.
+        """
+        self._update_location()
+
+    def _update_location(self):
         """Syncs underlying geocell properties with the entity's location.
 
         Updates the underlying geocell properties of the entity to match the
@@ -209,7 +215,7 @@ class GeoModel(ndb.Model):
                                         IN(cur_geocells_unique))
 
             # Update results and sort.
-            new_results = temp_query.fetch(1000) #TODO: Why 1000?
+            new_results = temp_query.fetch(1000)  # TODO: Why 1000?
             if _DEBUG:
                 logging.info('fetch complete for %s' % (','.join(cur_geocells_unique),))
 
